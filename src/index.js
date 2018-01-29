@@ -10,16 +10,16 @@ function getActions(states) {
     .filter((key, pos, arr) => arr.indexOf(key) === pos)
 }
 
-export function createMiddleware(machine, actionMap) {
+export function createMiddleware(machine, actionMap, reduxStateKey) {
   const validActions = getActions(machine.config.states)
 
   return ({ dispatch, getState }) => next => action => {
     if (validActions.includes(action.type)) {
       const state = getState()
-      const nextState = machine.transition(state.machine.value, action, state)
+      const nextState = machine.transition(state[reduxStateKey].value, action, state)
 
       dispatch({
-        type: "@@machine/UPDATE_STATE",
+        type: `@@${reduxStateKey}/UPDATE_STATE`,
         payload: nextState
       })
 
@@ -33,7 +33,7 @@ export function createMiddleware(machine, actionMap) {
   }
 }
 
-export function createReducer(initialState) {
+export function createReducer(initialState, reduxStateKey) {
   return (state = initialState, { type, payload }) =>
-    type === "@@machine/UPDATE_STATE" ? payload : state
+    type === `@@${reduxStateKey}/UPDATE_STATE` ? payload : state
 }
