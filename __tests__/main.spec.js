@@ -4,6 +4,9 @@ import { createStore, combineReducers, applyMiddleware } from "redux"
 import { createMiddleware, createReducer } from "../src"
 
 describe("xstate middleware", () => {
+  const reducerMapFoo = {
+    TIMER: (state, action) => action.payload,
+  }
   const actionMapFoo = {
     mockFn: jest.fn()
   }
@@ -58,14 +61,14 @@ describe("xstate middleware", () => {
   }
 
   const middlewareList = [
-    createMiddleware(machines.foo, actionMapFoo, reduxKeys.foo),
-    createMiddleware(machines.bar, actionMapBar, reduxKeys.bar)
+    createMiddleware(machines.foo, actionMapFoo, reducerMapFoo, reduxKeys.foo),
+    createMiddleware(machines.bar, actionMapBar, {}, reduxKeys.bar)
   ];
 
   const store = createStore(
     combineReducers({
-      [reduxKeys.foo]: createReducer(machines.foo.initialState, reduxKeys.foo),
-      [reduxKeys.bar]: createReducer(machines.bar.initialState, reduxKeys.bar)
+      [reduxKeys.foo]: createReducer(machines.foo, reduxKeys.foo),
+      [reduxKeys.bar]: createReducer(machines.bar, reduxKeys.bar)
     }),
     applyMiddleware(...middlewareList)
   )
@@ -73,14 +76,24 @@ describe("xstate middleware", () => {
   it("transitions machine state", () => {
     store.dispatch({ type: "TIMER" })
 
-    expect(store.getState().foo.value).toBe("yellow")
+    expect(store.getState()[reduxKeys.foo].state).toBe("yellow")
   })
 
   it("trigger actions", () => {
     store.dispatch({ type: "TIMER" })
 
-    expect(store.getState().foo.value).toEqual({ red: "walk" })
+    expect(store.getState().foo.state).toEqual({ red: "walk" })
     expect(actionMapFoo.mockFn.mock.calls.length).toBe(1)
     expect(actionMapFoo.mockFn.mock.calls[0][2]).toEqual({ type: "TIMER" })
+  })
+
+  it("trigger reducer", () => {
+    store.dispatch({
+      type: "TIMER",
+      payload: { foo: 'bar' }
+    })
+
+    expect(store.getState().foo.state).toEqual( "green" )
+    expect(store.getState().foo.data).toEqual({ foo: "bar" })
   })
 })

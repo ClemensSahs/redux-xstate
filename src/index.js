@@ -10,30 +10,53 @@ function getActions(states) {
     .filter((key, pos, arr) => arr.indexOf(key) === pos)
 }
 
-export function createMiddleware(machine, actionMap, reduxStateKey) {
+export function createMiddleware(machine, actionMap = {}, reducerMap = {}, reduxStateKey = 'machine') {
   const validActions = getActions(machine.config.states)
 
   return ({ dispatch, getState }) => next => action => {
     if (validActions.includes(action.type)) {
-      const state = getState()
-      const nextState = machine.transition(state[reduxStateKey].value, action, state)
+      const currentState = getState()
+      let nextState = {
+        state: null,
+        data: currentState[reduxStateKey].data
+      }
+      const machineState = machine.transition(
+        currentState[reduxStateKey].state,
+        action,
+        currentState
+      )
 
+      // write next state
+      nextState.state = machineState.value
+
+      // allow data reducer for state.action aka ReduxActionType
+      if (reducerMap[action.type] !== undefined) {
+        nextState.data = reducerMap[action.type](nextState.data, action)
+      }
+
+      // push the next state to redux
       dispatch({
         type: `@@${reduxStateKey}/UPDATE_STATE`,
         payload: nextState
       })
 
-      nextState.actions
+      // run xstate action
+      machineState.actions
         .map(key => actionMap[key])
         .filter(Boolean)
-        .forEach(fn => fn(dispatch, state, action))
+        .forEach(fn => fn(dispatch, currentState, action))
     }
 
     next(action)
   }
 }
 
-export function createReducer(initialState, reduxStateKey) {
+export function createReducer(machine, reduxStateKey = 'machine') {
+  const initialState = {
+    state: machine.initialStateValue,
+    data: {}
+  }
+
   return (state = initialState, { type, payload }) =>
     type === `@@${reduxStateKey}/UPDATE_STATE` ? payload : state
 }
